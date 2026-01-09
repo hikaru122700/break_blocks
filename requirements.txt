@@ -1,0 +1,23 @@
+# Break Blocks RL Training Dependencies
+
+# Core ML frameworks
+stable-baselines3>=2.0.0
+gymnasium>=0.29.0
+torch>=2.0.0
+
+# Data processing
+numpy>=1.24.0
+
+# ONNX export
+onnx>=1.14.0
+onnxruntime>=1.15.0
+
+# Visualization and logging
+tensorboard>=2.13.0
+tqdm>=4.65.0
+
+# Configuration
+pyyaml>=6.0
+
+# Optional: GPU support (install separately)
+# torch with CUDA: pip install torch --index-url https://download.pytorch.org/whl/cu118

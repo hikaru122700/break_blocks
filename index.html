@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLOCK BREAKER</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div class="loading-screen" id="loadingScreen">
+            <div class="loading-text">LOADING...</div>
+            <div class="loading-bar">
+                <div class="loading-bar-fill" id="loadingBarFill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Config -->
+    <script src="js/config/Constants.js"></script>
+
+    <!-- Utils -->
+    <script src="js/utils/Utils.js"></script>
+
+    <!-- Entities -->
+    <script src="js/entities/Ball.js"></script>
+    <script src="js/entities/Paddle.js"></script>
+    <script src="js/entities/Block.js"></script>
+    <script src="js/entities/NormalBlock.js"></script>
+    <script src="js/entities/DurableBlock.js"></script>
+    <script src="js/entities/PowerUp.js"></script>
+
+    <!-- Systems -->
+    <script src="js/systems/CollisionSystem.js"></script>
+    <script src="js/systems/ScoreSystem.js"></script>
+    <script src="js/systems/PowerUpSystem.js"></script>
+    <script src="js/systems/ParticleSystem.js"></script>
+
+    <!-- Managers -->
+    <script src="js/managers/InputManager.js"></script>
+    <script src="js/managers/SoundManager.js"></script>
+    <script src="js/managers/StorageManager.js"></script>
+    <script src="js/managers/StageManager.js"></script>
+
+    <!-- Stages -->
+    <script src="js/stages/StageData.js"></script>
+
+    <!-- UI -->
+    <script src="js/ui/MenuScreen.js"></script>
+    <script src="js/ui/HUD.js"></script>
+    <script src="js/ui/PauseScreen.js"></script>
+    <script src="js/ui/RankingScreen.js"></script>
+
+    <!-- AI -->
+    <script src="js/ai/AIController.js"></script>
+
+    <!-- RL Agent (ONNX) - Optional: only loads if ONNX Runtime is available -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <script src="js/ai/ONNXInference.js"></script>
+    <script src="js/ai/RLAgent.js"></script>
+
+    <!-- Game -->
+    <script src="js/game/GameState.js"></script>
+    <script src="js/game/Game.js"></script>
+
+    <!-- Entry Point -->
+    <script src="js/main.js"></script>
+</body>
+</html>
