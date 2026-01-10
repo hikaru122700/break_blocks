@@ -223,7 +223,7 @@ def main():
     parser = argparse.ArgumentParser(description='Train Break Blocks RL agent')
     parser.add_argument('--config', type=str, default=None,
                         help='Path to config YAML file')
-    parser.add_argument('--timesteps', type=int, default=10000000,
+    parser.add_argument('--timesteps', type=int, default=0000000,
                         help='Total training timesteps')
     parser.add_argument('--envs', type=int, default=8,
                         help='Number of parallel environments')
