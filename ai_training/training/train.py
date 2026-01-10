@@ -134,10 +134,18 @@ def train(
     eval_env = DummyVecEnv([make_env(stage_number=1, max_stage=10)])
 
     # Create or load model
-    if resume_from and os.path.exists(resume_from):
+    # Handle both with and without .zip extension
+    resume_path = None
+    if resume_from:
+        if os.path.exists(resume_from):
+            resume_path = resume_from
+        elif os.path.exists(resume_from + '.zip'):
+            resume_path = resume_from + '.zip'
+
+    if resume_path:
         if verbose:
-            print(f"Resuming from {resume_from}")
-        model = PPO.load(resume_from, env=env, device=device)
+            print(f"Resuming from {resume_path}")
+        model = PPO.load(resume_path, env=env, device=device)
     else:
         if verbose:
             print("Creating new model...")
