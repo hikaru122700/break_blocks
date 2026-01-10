@@ -66,6 +66,7 @@ class BreakoutEnv(gym.Env):
         self.episode_time_elapsed = 0.0
         self.max_combo = 0
         self._close_bonus_given = False
+        self._steps_since_last_block = 0
 
         # Delta time per frame (16.67ms for 60fps)
         self.dt = 16.67
@@ -106,6 +107,7 @@ class BreakoutEnv(gym.Env):
         self.episode_time_elapsed = 0.0
         self.max_combo = 0
         self._close_bonus_given = False
+        self._steps_since_last_block = 0
 
         obs = self._get_obs()
         info = self._get_info()
