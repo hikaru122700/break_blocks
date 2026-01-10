@@ -629,46 +629,33 @@ class GameSimulation:
         """
         Get current observation vector.
 
-        Returns 216-dimensional observation:
-        - Ball 1: x, y, vx, vy, speed, is_penetrating (6)
-        - Ball 2: same (6) - zeros if no second ball
+        Returns 507-dimensional observation:
+        - Balls (up to 32): x, y, vx, vy, speed, is_penetrating (32 * 6 = 192)
         - Paddle: x, velocity (2)
         - Time: remaining / limit (1)
         - Block existence: 12x8 grid (96)
         - Block HP: 12x8 grid normalized (96)
-        - Power-up: speed_modifier, penetrating, ball_count, nearest_powerup_x, nearest_powerup_y (5)
+        - Block type: 12x8 grid normalized (96)
+        - Power-ups (up to 5): x, y, type, active (5 * 4 = 20)
         - Game state: lives, stage, remaining_blocks_ratio (3)
         - Stage speed: ball_speed_multiplier (1)
         """
         obs = []
 
-        # Ball 1 (6 dimensions)
-        if self.balls:
-            ball = self.balls[0]
-            obs.extend([
-                ball.x / CANVAS_WIDTH,
-                ball.y / CANVAS_HEIGHT,
-                ball.vx / 10.0,  # Normalize velocity
-                ball.vy / 10.0,
-                ball.speed / 10.0,
-                1.0 if ball.is_penetrating else 0.0
-            ])
-        else:
-            obs.extend([0.0] * 6)
-
-        # Ball 2 (6 dimensions)
-        if len(self.balls) > 1:
-            ball = self.balls[1]
-            obs.extend([
-                ball.x / CANVAS_WIDTH,
-                ball.y / CANVAS_HEIGHT,
-                ball.vx / 10.0,
-                ball.vy / 10.0,
-                ball.speed / 10.0,
-                1.0 if ball.is_penetrating else 0.0
-            ])
-        else:
-            obs.extend([0.0] * 6)
+        # Balls (up to MAX_BALLS, 6 dimensions each = 192 total)
+        for i in range(MAX_BALLS):
+            if i < len(self.balls):
+                ball = self.balls[i]
+                obs.extend([
+                    ball.x / CANVAS_WIDTH,
+                    ball.y / CANVAS_HEIGHT,
+                    ball.vx / 10.0,
+                    ball.vy / 10.0,
+                    ball.speed / 10.0,
+                    1.0 if ball.is_penetrating else 0.0
+                ])
+            else:
+                obs.extend([0.0] * 6)
 
         # Paddle (2 dimensions)
         obs.extend([
@@ -679,9 +666,10 @@ class GameSimulation:
         # Time (1 dimension)
         obs.append(self.time_remaining / self.time_limit if self.time_limit > 0 else 0.0)
 
-        # Block existence grid (96 dimensions)
+        # Block grids (96 dimensions each = 288 total)
         block_grid = [[0.0] * BLOCK_COLS for _ in range(BLOCK_ROWS)]
         hp_grid = [[0.0] * BLOCK_COLS for _ in range(BLOCK_ROWS)]
+        type_grid = [[0.0] * BLOCK_COLS for _ in range(BLOCK_ROWS)]
 
         for block in self.blocks:
             if block.is_destroyed:
@@ -691,34 +679,40 @@ class GameSimulation:
             if 0 <= row < BLOCK_ROWS and 0 <= col < BLOCK_COLS:
                 block_grid[row][col] = 1.0
                 hp_grid[row][col] = block.hit_points / block.max_hit_points
+                # Normalize block type (0-11 range -> 0-1)
+                type_grid[row][col] = block.block_type / 11.0
 
         for row in block_grid:
             obs.extend(row)
-
-        # Block HP grid (96 dimensions)
         for row in hp_grid:
             obs.extend(row)
+        for row in type_grid:
+            obs.extend(row)
 
-        # Power-up state (4 dimensions)
-        obs.append(self.speed_modifier)
+        # Power-ups (up to MAX_POWERUPS, 4 dimensions each = 20 total)
+        # Encode powerup type as: multi_ball=1, speed_up=0.8, speed_down=0.6, penetrate=0.4, time_extend=0.2
+        powerup_type_encoding = {
+            PowerUpType.MULTI_BALL: 1.0,
+            PowerUpType.PENETRATE: 0.8,
+            PowerUpType.TIME_EXTEND: 0.6,
+            PowerUpType.SPEED_DOWN: 0.4,
+            PowerUpType.SPEED_UP: 0.2,
+        }
+        active_powerups = [p for p in self.powerups if p.is_active]
+        # Sort by Y position (closest to paddle first)
+        active_powerups.sort(key=lambda p: -p.y)
 
-        # Check if any ball is penetrating
-        any_penetrating = any(b.is_penetrating for b in self.balls)
-        obs.append(1.0 if any_penetrating else 0.0)
-
-        obs.append(len(self.balls) / 5.0)  # Normalized ball count
-
-        # Nearest falling power-up position (X and Y)
-        nearest_powerup_x = 0.5  # Default to center
-        nearest_powerup_y = 1.0  # Default to off-screen (bottom)
-        for powerup in self.powerups:
-            if powerup.is_active:
-                normalized_y = powerup.y / CANVAS_HEIGHT
-                if normalized_y < nearest_powerup_y:
-                    nearest_powerup_y = normalized_y
-                    nearest_powerup_x = powerup.x / CANVAS_WIDTH
-        obs.append(nearest_powerup_x)
-        obs.append(nearest_powerup_y)
+        for i in range(MAX_POWERUPS):
+            if i < len(active_powerups):
+                p = active_powerups[i]
+                obs.extend([
+                    p.x / CANVAS_WIDTH,
+                    p.y / CANVAS_HEIGHT,
+                    powerup_type_encoding.get(p.powerup_type, 0.0),
+                    1.0  # is_active
+                ])
+            else:
+                obs.extend([0.5, 1.0, 0.0, 0.0])  # Default: center, off-screen, no type, inactive
 
         # Game state (3 dimensions)
         obs.append(self.lives / INITIAL_LIVES)
