@@ -277,7 +277,19 @@ def get_stage_data(stage_number: int) -> dict:
 
 # RL-specific constants
 FRAME_SKIP = 4  # Number of frames to repeat same action
-OBSERVATION_DIM = 216  # Total observation dimensions (added powerup X position)
+MAX_BALLS = 32  # Maximum number of balls to observe
+MAX_POWERUPS = 5  # Maximum number of powerups to observe
+# Observation dimensions:
+# - Balls: 32 * 6 = 192 (x, y, vx, vy, speed, is_penetrating)
+# - Paddle: 2 (x, velocity)
+# - Time: 1
+# - Block existence: 96 (12x8 grid)
+# - Block HP: 96 (12x8 grid)
+# - Block type: 96 (12x8 grid, normalized type)
+# - Powerups: 5 * 4 = 20 (x, y, type, active)
+# - Game state: 3 (lives, stage, remaining_blocks_ratio)
+# - Stage speed: 1
+OBSERVATION_DIM = 507
 ACTION_DIM = 3  # Left, Stay, Right
 
 # Paddle movement per action
