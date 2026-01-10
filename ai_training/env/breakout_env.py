@@ -238,8 +238,8 @@ class BreakoutEnv(gym.Env):
         if events['game_over']:
             reward -= 500.0
 
-        # Small time penalty (less aggressive)
-        reward -= 0.05 * self.time_penalty_scale
+        # Time penalty (stronger to discourage wall-hitting)
+        reward -= 0.2 * self.time_penalty_scale
 
         return reward
 
