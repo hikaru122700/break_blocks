@@ -88,7 +88,7 @@ def train(
         'gamma': 0.995,  # Higher discount for long-term thinking
         'gae_lambda': 0.95,
         'clip_range': 0.2,
-        'ent_coef': 0.005,  # Lower entropy for more exploitation
+        'ent_coef': 0.01,  # Higher entropy for more exploration
     })
 
     policy_kwargs = config.get('policy_kwargs', {
