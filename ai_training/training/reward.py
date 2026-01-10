@@ -113,6 +113,13 @@ class RewardCalculator:
             elif powerup == PowerUpType.SPEED_UP:
                 reward += self.powerup_speed_up
 
+        # Close to clear bonus (one-time per episode)
+        if (blocks_remaining >= 0 and
+            blocks_remaining <= self.close_to_clear_threshold and
+            not self._close_bonus_given):
+            reward += self.close_to_clear_bonus
+            self._close_bonus_given = True
+
         # Stage clear bonus
         if events.get('stage_clear', False):
             reward += self.stage_clear
