@@ -204,6 +204,7 @@ def train(
         if torch.cuda.is_available():
             print(f"GPU: {torch.cuda.get_device_name(0)}")
 
+    interrupted = False
     try:
         model.learn(
             total_timesteps=total_timesteps,
@@ -212,8 +213,20 @@ def train(
         )
     except KeyboardInterrupt:
         print("\nTraining interrupted by user")
-    finally:
-        # Save final model
+        interrupted = True
+
+    # Save model
+    if interrupted:
+        # Save with timestamp to avoid overwriting good models
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        interrupted_path = os.path.join(save_path, f'interrupted_{timestamp}')
+        model.save(interrupted_path)
+        if verbose:
+            print(f"\nInterrupted model saved to {interrupted_path}")
+            print("(final_model was NOT overwritten)")
+    else:
+        # Training completed - safe to overwrite
         final_path = os.path.join(save_path, 'final_model')
         model.save(final_path)
         if verbose:
