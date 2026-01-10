@@ -2,6 +2,12 @@
  * Reinforcement Learning Agent for Break Blocks.
  * Uses ONNX model trained with PPO for decision making.
  */
+
+// Constants for observation space
+const MAX_BALLS = 32;
+const MAX_POWERUPS = 5;
+const OBSERVATION_DIM = 507;
+
 class RLAgent {
     constructor(game) {
         this.game = game;
@@ -18,8 +24,8 @@ class RLAgent {
         this.autoLaunchDelay = 500;
         this.autoLaunchTimer = 0;
 
-        // Observation buffer (216 dimensions - includes powerup X position)
-        this.observation = new Float32Array(216);
+        // Observation buffer (507 dimensions)
+        this.observation = new Float32Array(OBSERVATION_DIM);
 
         // Performance tracking
         this.inferenceTime = 0;
@@ -103,35 +109,24 @@ class RLAgent {
 
     /**
      * Build observation vector from game state.
-     * Matches the observation space from training.
+     * Matches the 507-dimensional observation space from training.
      */
     _buildObservation() {
         let idx = 0;
 
-        // Ball 1 (6 dimensions)
-        if (this.game.balls.length > 0) {
-            const ball = this.game.balls[0];
-            this.observation[idx++] = ball.x / CANVAS_WIDTH;
-            this.observation[idx++] = ball.y / CANVAS_HEIGHT;
-            this.observation[idx++] = ball.velocity.x / 10.0;
-            this.observation[idx++] = ball.velocity.y / 10.0;
-            this.observation[idx++] = ball.speed / 10.0;
-            this.observation[idx++] = ball.isPenetrating ? 1.0 : 0.0;
-        } else {
-            for (let i = 0; i < 6; i++) this.observation[idx++] = 0.0;
-        }
-
-        // Ball 2 (6 dimensions)
-        if (this.game.balls.length > 1) {
-            const ball = this.game.balls[1];
-            this.observation[idx++] = ball.x / CANVAS_WIDTH;
-            this.observation[idx++] = ball.y / CANVAS_HEIGHT;
-            this.observation[idx++] = ball.velocity.x / 10.0;
-            this.observation[idx++] = ball.velocity.y / 10.0;
-            this.observation[idx++] = ball.speed / 10.0;
-            this.observation[idx++] = ball.isPenetrating ? 1.0 : 0.0;
-        } else {
-            for (let i = 0; i < 6; i++) this.observation[idx++] = 0.0;
+        // Balls (up to MAX_BALLS, 6 dimensions each = 192 total)
+        for (let i = 0; i < MAX_BALLS; i++) {
+            if (i < this.game.balls.length) {
+                const ball = this.game.balls[i];
+                this.observation[idx++] = ball.x / CANVAS_WIDTH;
+                this.observation[idx++] = ball.y / CANVAS_HEIGHT;
+                this.observation[idx++] = ball.velocity.x / 10.0;
+                this.observation[idx++] = ball.velocity.y / 10.0;
+                this.observation[idx++] = ball.speed / 10.0;
+                this.observation[idx++] = ball.isPenetrating ? 1.0 : 0.0;
+            } else {
+                for (let j = 0; j < 6; j++) this.observation[idx++] = 0.0;
+            }
         }
 
         // Paddle (2 dimensions)
@@ -143,9 +138,10 @@ class RLAgent {
         const timeLimit = this.game.stageManager.getTimeLimit(this.game.currentStage);
         this.observation[idx++] = this.game.stageTimeRemaining / timeLimit;
 
-        // Block existence grid (96 dimensions - 12x8)
+        // Block grids (96 dimensions each = 288 total)
         const blockGrid = new Array(BLOCK_ROWS).fill(null).map(() => new Array(BLOCK_COLS).fill(0));
         const hpGrid = new Array(BLOCK_ROWS).fill(null).map(() => new Array(BLOCK_COLS).fill(0));
+        const typeGrid = new Array(BLOCK_ROWS).fill(null).map(() => new Array(BLOCK_COLS).fill(0));
 
         for (const block of this.game.blocks) {
             if (block.isDestroyed) continue;
@@ -156,6 +152,8 @@ class RLAgent {
                 const maxHP = block.maxHitPoints || 1;
                 const currentHP = block.hitPoints || 1;
                 hpGrid[row][col] = currentHP / maxHP;
+                // Normalize block type (0-11 range -> 0-1)
+                typeGrid[row][col] = (block.type || 0) / 11.0;
             }
         }
 
@@ -173,31 +171,45 @@ class RLAgent {
             }
         }
 
-        // Power-up state (4 dimensions)
-        const powerUpSystem = this.game.powerUpSystem;
-        this.observation[idx++] = powerUpSystem ? powerUpSystem.speedModifier : 1.0;
-
-        // Any ball penetrating
-        const anyPenetrating = this.game.balls.some(b => b.isPenetrating);
-        this.observation[idx++] = anyPenetrating ? 1.0 : 0.0;
-
-        // Ball count
-        this.observation[idx++] = this.game.balls.length / 5.0;
-
-        // Nearest falling power-up position (X and Y)
-        let nearestX = 0.5;  // Default to center
-        let nearestY = 1.0;  // Default to off-screen (bottom)
-        if (powerUpSystem && powerUpSystem.activePowerUps) {
-            for (const pu of powerUpSystem.activePowerUps) {
-                const normalizedY = pu.y / CANVAS_HEIGHT;
-                if (normalizedY < nearestY) {
-                    nearestY = normalizedY;
-                    nearestX = pu.x / CANVAS_WIDTH;
-                }
+        // Flatten type grid
+        for (let row = 0; row < BLOCK_ROWS; row++) {
+            for (let col = 0; col < BLOCK_COLS; col++) {
+                this.observation[idx++] = typeGrid[row][col];
             }
         }
-        this.observation[idx++] = nearestX;
-        this.observation[idx++] = nearestY;
+
+        // Power-ups (up to MAX_POWERUPS, 4 dimensions each = 20 total)
+        // Encode powerup type: multi_ball=1, penetrate=0.8, time_extend=0.6, speed_down=0.4, speed_up=0.2
+        const powerupTypeEncoding = {
+            'multi_ball': 1.0,
+            'penetrate': 0.8,
+            'time_extend': 0.6,
+            'speed_down': 0.4,
+            'speed_up': 0.2,
+        };
+
+        const powerUpSystem = this.game.powerUpSystem;
+        let activePowerups = [];
+        if (powerUpSystem && powerUpSystem.activePowerUps) {
+            activePowerups = powerUpSystem.activePowerUps
+                .filter(p => p.isActive !== false)
+                .sort((a, b) => b.y - a.y);  // Sort by Y (closest to paddle first)
+        }
+
+        for (let i = 0; i < MAX_POWERUPS; i++) {
+            if (i < activePowerups.length) {
+                const p = activePowerups[i];
+                this.observation[idx++] = p.x / CANVAS_WIDTH;
+                this.observation[idx++] = p.y / CANVAS_HEIGHT;
+                this.observation[idx++] = powerupTypeEncoding[p.type] || 0.0;
+                this.observation[idx++] = 1.0;  // is_active
+            } else {
+                this.observation[idx++] = 0.5;  // x: center
+                this.observation[idx++] = 1.0;  // y: off-screen
+                this.observation[idx++] = 0.0;  // type: none
+                this.observation[idx++] = 0.0;  // inactive
+            }
+        }
 
         // Game state (3 dimensions)
         this.observation[idx++] = this.game.lives / INITIAL_LIVES;
