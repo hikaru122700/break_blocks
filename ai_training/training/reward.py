@@ -16,7 +16,7 @@ class RewardCalculator:
         time_penalty: float = -0.01,
         block_destroy: float = 10.0,
         combo_bonus: float = 0.2,
-        stage_clear: float = 100.0,
+        stage_clear: float = 1000.0,
         time_bonus_max: float = 50.0,
         life_loss: float = -50.0,
         game_over: float = -200.0,
@@ -25,7 +25,9 @@ class RewardCalculator:
         powerup_multiball: float = 8.0,
         powerup_speed_down: float = 5.0,
         powerup_speed_up: float = 2.0,
-        time_penalty_scale: float = 1.0
+        time_penalty_scale: float = 1.0,
+        close_to_clear_bonus: float = 50.0,
+        close_to_clear_threshold: int = 5
     ):
         """
         Initialize reward calculator with weights.
