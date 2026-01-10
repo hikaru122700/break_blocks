@@ -62,9 +62,9 @@ def plot_training_curves(
         output_dir: Directory to save PNG files
         smoothing: Smoothing factor (0-1, higher = smoother)
     """
-    # Find the latest PPO run
+    # Find the latest PPO run (sort by number, not alphabetically)
     log_path = Path(log_dir)
-    ppo_dirs = sorted(log_path.glob('PPO_*'))
+    ppo_dirs = sorted(log_path.glob('PPO_*'), key=lambda p: int(p.name.split('_')[1]))
 
     if not ppo_dirs:
         print(f"No PPO logs found in {log_dir}")
