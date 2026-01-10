@@ -203,18 +203,18 @@ class BreakoutEnv(gym.Env):
         if combo > 0:
             reward += 0.5 * combo
 
-        # Power-up bonuses
+        # Power-up bonuses (high rewards for powerful items)
         for powerup in events['powerups_collected']:
             if powerup == PowerUpType.TIME_EXTEND:
-                reward += 20.0
+                reward += 50.0
             elif powerup == PowerUpType.PENETRATE:
-                reward += 15.0
+                reward += 80.0  # Very powerful for clearing
             elif powerup == PowerUpType.MULTI_BALL:
-                reward += 10.0
+                reward += 100.0  # Most powerful - must prioritize
             elif powerup == PowerUpType.SPEED_DOWN:
-                reward += 8.0
+                reward += 30.0
             elif powerup == PowerUpType.SPEED_UP:
-                reward += 3.0
+                reward += 5.0
 
         # Close to clear bonus (5 blocks or fewer remaining)
         if self.game and not self._close_bonus_given:
