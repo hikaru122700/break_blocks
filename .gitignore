@@ -9,3 +9,6 @@ wheels/
 # Virtual environments
 .venv
 venv/
+models/checkpoints/*.zip
+models/final_model.zip
+logs/
