@@ -62,12 +62,17 @@ class RewardCalculator:
         self.close_to_clear_threshold = close_to_clear_threshold
         self._close_bonus_given = False
 
+    def reset_episode(self):
+        """Reset per-episode state."""
+        self._close_bonus_given = False
+
     def calculate(
         self,
         events: Dict[str, Any],
         combo: int = 0,
         time_remaining: float = 0.0,
-        time_limit: float = 1.0
+        time_limit: float = 1.0,
+        blocks_remaining: int = -1
     ) -> float:
         """
         Calculate total reward for a step.
@@ -77,6 +82,7 @@ class RewardCalculator:
             combo: Current combo count
             time_remaining: Remaining time in ms
             time_limit: Total time limit in ms
+            blocks_remaining: Number of blocks still active
 
         Returns:
             Total reward
