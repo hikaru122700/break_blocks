@@ -157,6 +157,8 @@ class RewardCalculator:
             'powerup_speed_down': self.powerup_speed_down,
             'powerup_speed_up': self.powerup_speed_up,
             'time_penalty_scale': self.time_penalty_scale,
+            'close_to_clear_bonus': self.close_to_clear_bonus,
+            'close_to_clear_threshold': self.close_to_clear_threshold,
         }
 
 
