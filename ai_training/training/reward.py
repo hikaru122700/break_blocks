@@ -42,6 +42,8 @@ class RewardCalculator:
             game_over: Penalty for game over
             powerup_*: Rewards for collecting various power-ups
             time_penalty_scale: Multiplier for time penalty (curriculum learning)
+            close_to_clear_bonus: Bonus when blocks remaining <= threshold
+            close_to_clear_threshold: Number of blocks to trigger close bonus
         """
         self.time_penalty = time_penalty
         self.block_destroy = block_destroy
@@ -56,6 +58,9 @@ class RewardCalculator:
         self.powerup_speed_down = powerup_speed_down
         self.powerup_speed_up = powerup_speed_up
         self.time_penalty_scale = time_penalty_scale
+        self.close_to_clear_bonus = close_to_clear_bonus
+        self.close_to_clear_threshold = close_to_clear_threshold
+        self._close_bonus_given = False
 
     def calculate(
         self,
