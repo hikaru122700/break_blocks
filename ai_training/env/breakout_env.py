@@ -197,8 +197,19 @@ class BreakoutEnv(gym.Env):
         reward += events['paddle_hits'] * 5.0
 
         # Block destruction rewards
+        blocks_destroyed_this_step = len(events['block_scores'])
         for score in events['block_scores']:
             reward += 20.0
+
+        # Track progress and penalize stalling
+        if blocks_destroyed_this_step > 0:
+            self._steps_since_last_block = 0
+        else:
+            self._steps_since_last_block += 1
+            # Penalty grows after 100 steps (about 6 seconds) without destroying a block
+            if self._steps_since_last_block > 100:
+                stall_penalty = min((self._steps_since_last_block - 100) * 0.01, 1.0)
+                reward -= stall_penalty
 
         # Combo bonus (exponential for higher combos)
         combo = self.game.combo if self.game else 0
