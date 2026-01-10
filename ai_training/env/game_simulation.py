@@ -347,6 +347,7 @@ class GameSimulation:
             'combo': self.combo,
             'life_lost': False,
             'powerups_collected': [],
+            'paddle_hits': 0,
             'stage_clear': False,
             'game_over': False,
             'time_up': False,
@@ -380,7 +381,7 @@ class GameSimulation:
 
         # Check collisions
         self._check_ball_wall_collisions()
-        self._check_ball_paddle_collisions()
+        events['paddle_hits'] = self._check_ball_paddle_collisions()
         block_events = self._check_ball_block_collisions()
         events['blocks_destroyed'] = block_events['destroyed']
         events['block_scores'] = block_events['scores']
@@ -451,8 +452,13 @@ class GameSimulation:
                 ball.y = ball.radius
                 ball.reflect(0, 1)
 
-    def _check_ball_paddle_collisions(self):
-        """Check and handle ball-paddle collisions."""
+    def _check_ball_paddle_collisions(self) -> int:
+        """Check and handle ball-paddle collisions.
+
+        Returns:
+            Number of paddle hits this frame
+        """
+        paddle_hits = 0
         for ball in self.balls:
             if not ball.is_launched or ball.vy <= 0:
                 continue
@@ -467,6 +473,9 @@ class GameSimulation:
 
                 # Ensure ball is above paddle
                 ball.y = self.paddle.y - ball.radius - 1
+                paddle_hits += 1
+
+        return paddle_hits
 
     def _check_ball_block_collisions(self) -> Dict[str, Any]:
         """Check and handle ball-block collisions."""
@@ -619,14 +628,14 @@ class GameSimulation:
         """
         Get current observation vector.
 
-        Returns 215-dimensional observation:
+        Returns 216-dimensional observation:
         - Ball 1: x, y, vx, vy, speed, is_penetrating (6)
         - Ball 2: same (6) - zeros if no second ball
         - Paddle: x, velocity (2)
         - Time: remaining / limit (1)
         - Block existence: 12x8 grid (96)
         - Block HP: 12x8 grid normalized (96)
-        - Power-up: speed_modifier, penetrating, ball_count, nearest_powerup_y (4)
+        - Power-up: speed_modifier, penetrating, ball_count, nearest_powerup_x, nearest_powerup_y (5)
         - Game state: lives, stage, remaining_blocks_ratio (3)
         - Stage speed: ball_speed_multiplier (1)
         """
@@ -698,13 +707,16 @@ class GameSimulation:
 
         obs.append(len(self.balls) / 5.0)  # Normalized ball count
 
-        # Nearest falling power-up Y position
-        nearest_powerup_y = 1.0
+        # Nearest falling power-up position (X and Y)
+        nearest_powerup_x = 0.5  # Default to center
+        nearest_powerup_y = 1.0  # Default to off-screen (bottom)
         for powerup in self.powerups:
             if powerup.is_active:
                 normalized_y = powerup.y / CANVAS_HEIGHT
                 if normalized_y < nearest_powerup_y:
                     nearest_powerup_y = normalized_y
+                    nearest_powerup_x = powerup.x / CANVAS_WIDTH
+        obs.append(nearest_powerup_x)
         obs.append(nearest_powerup_y)
 
         # Game state (3 dimensions)

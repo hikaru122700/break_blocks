@@ -44,7 +44,7 @@ class ONNXInference {
 
     /**
      * Run inference on observation.
-     * @param {Float32Array} observation - 215-dimensional observation vector
+     * @param {Float32Array} observation - 216-dimensional observation vector
      * @returns {Promise<Float32Array>} Action probabilities (3 values)
      */
     async predict(observation) {

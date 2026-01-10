@@ -98,7 +98,7 @@ POWERUP_WEIGHTS: Dict[str, int] = {
     PowerUpType.SPEED_DOWN: 20,
     PowerUpType.SPEED_UP: 15,
     PowerUpType.PENETRATE: 20,
-    PowerUpType.TIME_EXTEND: 20,
+    PowerUpType.TIME_EXTEND: 25,
 }
 
 # Combo multipliers (sorted by combo threshold descending)
@@ -146,7 +146,7 @@ STAGE_DATA = [
             [B.NONE]*1 + [B.NORMAL_BLUE]*10 + [B.NONE]*1,
         ],
         'ball_speed_multiplier': 1.0,
-        'powerup_chance': 0.15,
+        'powerup_chance': 0.20,
         'time_limit': 90000,
     },
 
@@ -277,7 +277,7 @@ def get_stage_data(stage_number: int) -> dict:
 
 # RL-specific constants
 FRAME_SKIP = 4  # Number of frames to repeat same action
-OBSERVATION_DIM = 215  # Total observation dimensions
+OBSERVATION_DIM = 216  # Total observation dimensions (added powerup X position)
 ACTION_DIM = 3  # Left, Stay, Right
 
 # Paddle movement per action

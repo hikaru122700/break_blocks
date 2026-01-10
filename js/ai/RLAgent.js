@@ -18,8 +18,8 @@ class RLAgent {
         this.autoLaunchDelay = 500;
         this.autoLaunchTimer = 0;
 
-        // Observation buffer
-        this.observation = new Float32Array(215);
+        // Observation buffer (216 dimensions - includes powerup X position)
+        this.observation = new Float32Array(216);
 
         // Performance tracking
         this.inferenceTime = 0;
@@ -184,14 +184,19 @@ class RLAgent {
         // Ball count
         this.observation[idx++] = this.game.balls.length / 5.0;
 
-        // Nearest falling power-up Y
-        let nearestY = 1.0;
+        // Nearest falling power-up position (X and Y)
+        let nearestX = 0.5;  // Default to center
+        let nearestY = 1.0;  // Default to off-screen (bottom)
         if (powerUpSystem && powerUpSystem.activePowerUps) {
             for (const pu of powerUpSystem.activePowerUps) {
                 const normalizedY = pu.y / CANVAS_HEIGHT;
-                if (normalizedY < nearestY) nearestY = normalizedY;
+                if (normalizedY < nearestY) {
+                    nearestY = normalizedY;
+                    nearestX = pu.x / CANVAS_WIDTH;
+                }
             }
         }
+        this.observation[idx++] = nearestX;
         this.observation[idx++] = nearestY;
 
         // Game state (3 dimensions)

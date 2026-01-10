@@ -6,13 +6,17 @@ from typing import Optional
 import yaml
 
 import torch
+# Optimize for single-threaded inference (faster for small batches)
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import CallbackList
 
 from ..env import BreakoutEnv, CurriculumBreakoutEnv
-from .callbacks import TrainingCallback, CurriculumCallback, BestModelCallback
+from .callbacks import TrainingCallback, CurriculumCallback, BestModelCallback, WinRateEarlyStopCallback
 
 
 def make_env(
@@ -75,26 +79,27 @@ def train(
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
 
-    # Default hyperparameters
+    # Default hyperparameters - optimized for 100% win rate
     ppo_params = config.get('ppo', {
-        'learning_rate': 3e-4,
-        'n_steps': 2048,
-        'batch_size': 64,
+        'learning_rate': 1e-4,  # Lower for stability
+        'n_steps': 4096,  # More steps per update
+        'batch_size': 128,  # Larger batch
         'n_epochs': 10,
-        'gamma': 0.99,
+        'gamma': 0.995,  # Higher discount for long-term thinking
         'gae_lambda': 0.95,
         'clip_range': 0.2,
-        'ent_coef': 0.01,
+        'ent_coef': 0.005,  # Lower entropy for more exploitation
     })
 
     policy_kwargs = config.get('policy_kwargs', {
-        'net_arch': [256, 256, 128]
+        'net_arch': [512, 512, 256]  # Larger network
     })
 
+    # Curriculum disabled - focus on stage 1 only
     curriculum = config.get('curriculum', {
         'initial_max_stage': 1,
-        'phase_steps': [500000, 1500000, 3500000, 6500000, 10000000],
-        'time_penalty_scales': [1.0, 1.0, 1.0, 1.0, 2.0]
+        'phase_steps': [],  # Empty = no curriculum
+        'time_penalty_scales': [1.0]
     })
 
     # Create directories
@@ -150,26 +155,39 @@ def train(
         )
 
     # Create callbacks
-    callbacks = CallbackList([
+    callback_list = [
         TrainingCallback(
-            log_freq=5000,
+            log_freq=10000,
             save_freq=100000,
             save_path=os.path.join(save_path, 'checkpoints'),
-            verbose=verbose
-        ),
-        CurriculumCallback(
-            phase_steps=curriculum['phase_steps'],
             verbose=verbose
         ),
         BestModelCallback(
             eval_env=eval_env,
             best_model_save_path=os.path.join(save_path, 'best_model'),
             log_path=log_path,
-            eval_freq=20000,
-            n_eval_episodes=10,
+            eval_freq=50000,
+            n_eval_episodes=20,
+            verbose=verbose
+        ),
+        WinRateEarlyStopCallback(
+            eval_env=eval_env,
+            target_win_rate=0.95,  # Stop at 95% win rate
+            eval_freq=100000,
+            n_eval_episodes=50,
+            min_timesteps=500000,
             verbose=verbose
         )
-    ])
+    ]
+
+    # Only add curriculum if phase_steps is not empty
+    if curriculum['phase_steps']:
+        callback_list.insert(1, CurriculumCallback(
+            phase_steps=curriculum['phase_steps'],
+            verbose=verbose
+        ))
+
+    callbacks = CallbackList(callback_list)
 
     # Train
     if verbose:

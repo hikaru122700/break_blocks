@@ -127,6 +127,7 @@ class BreakoutEnv(gym.Env):
             'blocks_destroyed': 0,
             'block_scores': [],
             'powerups_collected': [],
+            'paddle_hits': 0,
             'life_lost': False,
             'stage_clear': False,
             'game_over': False,
@@ -141,6 +142,7 @@ class BreakoutEnv(gym.Env):
             events_accumulated['blocks_destroyed'] += events['blocks_destroyed']
             events_accumulated['block_scores'].extend(events['block_scores'])
             events_accumulated['powerups_collected'].extend(events['powerups_collected'])
+            events_accumulated['paddle_hits'] += events['paddle_hits']
             events_accumulated['life_lost'] = events_accumulated['life_lost'] or events['life_lost']
             events_accumulated['stage_clear'] = events_accumulated['stage_clear'] or events['stage_clear']
             events_accumulated['game_over'] = events_accumulated['game_over'] or events['game_over']
@@ -175,56 +177,60 @@ class BreakoutEnv(gym.Env):
         """
         Calculate reward based on events.
 
-        Reward shaping for fastest clear:
-        - Time penalty per frame (encourages speed)
+        Reward design for 100% win rate:
+        - Paddle hit bonus (critical for survival)
         - Block destroy bonus
         - Combo bonus
-        - Stage clear bonus with time bonus
-        - Life loss penalty
-        - Game over penalty
+        - Stage clear bonus (large)
         - Power-up bonuses
+        - Life loss penalty (large)
+        - Game over penalty (very large)
+        - Small time penalty
         """
         reward = 0.0
 
-        # Time penalty per frame (scaled for curriculum)
-        reward -= 0.01 * self.time_penalty_scale
+        # Paddle hit reward - CRITICAL for learning to keep ball in play
+        reward += events['paddle_hits'] * 5.0
 
         # Block destruction rewards
         for score in events['block_scores']:
-            reward += 10.0
+            reward += 20.0
 
-        # Combo bonus
+        # Combo bonus (exponential for higher combos)
         combo = self.game.combo if self.game else 0
         if combo > 0:
-            reward += 0.2 * combo
+            reward += 0.5 * combo
 
         # Power-up bonuses
         for powerup in events['powerups_collected']:
             if powerup == PowerUpType.TIME_EXTEND:
-                reward += 15.0
+                reward += 20.0
             elif powerup == PowerUpType.PENETRATE:
-                reward += 10.0
+                reward += 15.0
             elif powerup == PowerUpType.MULTI_BALL:
-                reward += 8.0
+                reward += 10.0
             elif powerup == PowerUpType.SPEED_DOWN:
-                reward += 5.0
+                reward += 8.0
             elif powerup == PowerUpType.SPEED_UP:
-                reward += 2.0  # Small bonus, can be risky
+                reward += 3.0
 
-        # Stage clear bonus
+        # Stage clear bonus - make this the primary goal
         if events['stage_clear']:
-            reward += 100.0
+            reward += 500.0
             # Time bonus: reward for remaining time
             if self.game:
                 time_ratio = self.game.time_remaining / self.game.time_limit
-                reward += 50.0 * time_ratio
+                reward += 200.0 * time_ratio
 
         # Penalties
         if events['life_lost']:
-            reward -= 50.0
+            reward -= 100.0
 
         if events['game_over']:
-            reward -= 200.0
+            reward -= 500.0
+
+        # Small time penalty (less aggressive)
+        reward -= 0.05 * self.time_penalty_scale
 
         return reward
 
@@ -252,6 +258,11 @@ class BreakoutEnv(gym.Env):
             'is_stage_clear': self.game.is_stage_clear,
             'is_game_over': self.game.is_game_over,
         }
+
+    def set_phase(self, phase: int):
+        """Set curriculum phase (for compatibility with CurriculumCallback)."""
+        # Base class does nothing - override in CurriculumBreakoutEnv for full support
+        pass
 
     def render(self):
         """Render the environment (not implemented for training)."""

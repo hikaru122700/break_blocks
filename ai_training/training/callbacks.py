@@ -232,3 +232,96 @@ class BestModelCallback(EvalCallback):
                 pass
 
         return result
+
+
+class WinRateEarlyStopCallback(BaseCallback):
+    """
+    Early stopping callback based on win rate.
+    Stops training when target win rate is reached.
+    """
+
+    def __init__(
+        self,
+        eval_env: VecEnv,
+        target_win_rate: float = 0.95,
+        eval_freq: int = 50000,
+        n_eval_episodes: int = 50,
+        min_timesteps: int = 1000000,
+        verbose: int = 1
+    ):
+        """
+        Initialize early stopping callback.
+
+        Args:
+            eval_env: Environment for evaluation
+            target_win_rate: Win rate to stop training (0-1)
+            eval_freq: How often to evaluate (in timesteps)
+            n_eval_episodes: Episodes per evaluation
+            min_timesteps: Minimum steps before allowing early stop
+            verbose: Verbosity level
+        """
+        super().__init__(verbose)
+        self.eval_env = eval_env
+        self.target_win_rate = target_win_rate
+        self.eval_freq = eval_freq
+        self.n_eval_episodes = n_eval_episodes
+        self.min_timesteps = min_timesteps
+        self.best_win_rate = 0.0
+        self.last_eval_step = 0
+
+    def _on_step(self) -> bool:
+        """Check win rate and stop if target reached."""
+        if self.num_timesteps - self.last_eval_step < self.eval_freq:
+            return True
+
+        self.last_eval_step = self.num_timesteps
+
+        # Run evaluation
+        wins = 0
+        total_reward = 0
+
+        for _ in range(self.n_eval_episodes):
+            obs = self.eval_env.reset()
+            done = False
+            episode_reward = 0
+
+            while not done:
+                action, _ = self.model.predict(obs, deterministic=True)
+                obs, reward, done, info = self.eval_env.step(action)
+                episode_reward += reward[0]
+                done = done[0]
+
+                if done:
+                    if info[0].get('is_stage_clear', False):
+                        wins += 1
+
+            total_reward += episode_reward
+
+        win_rate = wins / self.n_eval_episodes
+        avg_reward = total_reward / self.n_eval_episodes
+
+        if win_rate > self.best_win_rate:
+            self.best_win_rate = win_rate
+
+        if self.verbose > 0:
+            print(f"\n[WinRate Eval @ {self.num_timesteps}] "
+                  f"Win Rate: {win_rate:.1%} ({wins}/{self.n_eval_episodes}) | "
+                  f"Avg Reward: {avg_reward:.1f} | Best: {self.best_win_rate:.1%}")
+
+        # Log to tensorboard
+        if self.logger is not None:
+            self.logger.record('eval/win_rate', win_rate)
+            self.logger.record('eval/best_win_rate', self.best_win_rate)
+            self.logger.record('eval/avg_reward', avg_reward)
+
+        # Check early stopping
+        if (win_rate >= self.target_win_rate and
+            self.num_timesteps >= self.min_timesteps):
+            if self.verbose > 0:
+                print(f"\n{'='*50}")
+                print(f"TARGET WIN RATE {self.target_win_rate:.0%} REACHED!")
+                print(f"Stopping training at {self.num_timesteps} timesteps")
+                print(f"{'='*50}")
+            return False  # Stop training
+
+        return True
