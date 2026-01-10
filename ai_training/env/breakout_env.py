@@ -216,9 +216,16 @@ class BreakoutEnv(gym.Env):
             elif powerup == PowerUpType.SPEED_UP:
                 reward += 3.0
 
+        # Close to clear bonus (5 blocks or fewer remaining)
+        if self.game and not self._close_bonus_given:
+            active_blocks = sum(1 for b in self.game.blocks if not b.is_destroyed)
+            if active_blocks <= 5 and active_blocks > 0:
+                reward += 50.0
+                self._close_bonus_given = True
+
         # Stage clear bonus - make this the primary goal
         if events['stage_clear']:
-            reward += 500.0
+            reward += 1000.0
             # Time bonus: reward for remaining time
             if self.game:
                 time_ratio = self.game.time_remaining / self.game.time_limit
