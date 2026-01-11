@@ -5,54 +5,58 @@ from ..env.game_simulation import GameSimulation, Ball
 from ..env.constants import (
     CANVAS_WIDTH, CANVAS_HEIGHT,
     PADDLE_WIDTH, PADDLE_SPEED,
-    BALL_RADIUS,
+    BALL_RADIUS, BLOCK_OFFSET_TOP, BLOCK_HEIGHT, BLOCK_PADDING, BLOCK_ROWS,
     PowerUpType
 )
+
+# Y position where blocks end
+BLOCK_BOTTOM_Y = BLOCK_OFFSET_TOP + BLOCK_ROWS * (BLOCK_HEIGHT + BLOCK_PADDING) + 20
 
 
 class ExpertAI:
     """
-    Expert AI with trajectory prediction.
+    Expert AI with smart trajectory prediction.
 
-    Predicts where the ball will land at paddle height,
-    accounting for wall bounces.
+    - When ball is in block area: tracks ball's X position
+    - When ball is below blocks: predicts landing position with wall bounces
     """
 
     def __init__(self):
         self.target_x = CANVAS_WIDTH / 2
 
     def get_action(self, game: GameSimulation) -> int:
-        """Get action based on ball trajectory prediction."""
+        """Get action based on ball state and trajectory."""
         paddle = game.paddle
         balls = game.balls
 
         if not balls:
             return 1  # Stay
 
-        # Find the most dangerous ball (moving toward paddle)
+        # Find the most urgent ball
         target_ball = self._get_target_ball(balls, paddle)
 
-        if target_ball and target_ball.vy > 0:
-            # Predict where ball will land
-            self.target_x = self._predict_landing_x(target_ball, paddle.y)
-        elif target_ball:
-            # Ball moving up - just track its current x
-            self.target_x = target_ball.x
+        if target_ball:
+            if target_ball.vy > 0:
+                # Ball moving down
+                if target_ball.y > BLOCK_BOTTOM_Y:
+                    # Ball is below blocks - predict landing
+                    self.target_x = self._predict_landing_x(target_ball, paddle.y)
+                else:
+                    # Ball is in block area - just track it
+                    self.target_x = target_ball.x
+            else:
+                # Ball moving up - anticipate where it might come back
+                # Stay closer to center but bias toward ball's X
+                self.target_x = target_ball.x * 0.7 + CANVAS_WIDTH / 2 * 0.3
         else:
-            # Default to center
             self.target_x = CANVAS_WIDTH / 2
 
-        # Move toward target
+        # Move toward target - be aggressive
         paddle_center = paddle.x + PADDLE_WIDTH / 2
         diff = self.target_x - paddle_center
 
-        # Adjust dead zone based on urgency
-        dead_zone = 10
-        if target_ball and target_ball.vy > 0:
-            # Ball is coming - smaller dead zone for precision
-            time_to_paddle = (paddle.y - target_ball.y) / target_ball.vy if target_ball.vy > 0 else 999
-            if time_to_paddle < 30:  # Ball is close
-                dead_zone = 5
+        # Smaller dead zone for precision
+        dead_zone = 8
 
         if diff < -dead_zone:
             return 0  # Left
@@ -62,20 +66,15 @@ class ExpertAI:
             return 1  # Stay
 
     def _get_target_ball(self, balls: List[Ball], paddle) -> Optional[Ball]:
-        """Get the ball we should focus on (most dangerous)."""
+        """Get the most dangerous ball."""
         paddle_y = paddle.y
 
-        # Priority: balls moving down toward paddle
+        # Balls moving down
         down_balls = [b for b in balls if b.vy > 0 and b.is_launched]
 
         if down_balls:
-            # Pick the one that will reach paddle first
-            def time_to_paddle(ball):
-                if ball.vy <= 0:
-                    return float('inf')
-                return (paddle_y - ball.y) / ball.vy
-
-            return min(down_balls, key=time_to_paddle)
+            # Pick the one closest to paddle (most urgent)
+            return max(down_balls, key=lambda b: b.y)
 
         # No balls moving down - pick lowest launched ball
         launched_balls = [b for b in balls if b.is_launched]
@@ -86,29 +85,27 @@ class ExpertAI:
 
     def _predict_landing_x(self, ball: Ball, paddle_y: float) -> float:
         """
-        Predict where the ball will be when it reaches paddle Y.
-        Accounts for wall bounces.
+        Predict where ball will land at paddle Y.
+        Only accounts for wall bounces (no blocks).
         """
         if ball.vy <= 0:
-            return ball.x  # Ball not moving down
+            return ball.x
 
-        # Simulate ball trajectory
         x = ball.x
         y = ball.y
         vx = ball.vx
         vy = ball.vy
 
-        # Maximum iterations to prevent infinite loop
-        max_iterations = 1000
+        max_iterations = 100
         iteration = 0
 
         while y < paddle_y and iteration < max_iterations:
             iteration += 1
 
-            # Calculate time to reach paddle Y
+            # Time to reach paddle
             time_to_paddle = (paddle_y - y) / vy
 
-            # Calculate time to hit left/right wall
+            # Time to hit wall
             if vx < 0:
                 time_to_wall = (BALL_RADIUS - x) / vx
             elif vx > 0:
@@ -117,20 +114,16 @@ class ExpertAI:
                 time_to_wall = float('inf')
 
             if time_to_wall > 0 and time_to_wall < time_to_paddle:
-                # Ball hits wall before reaching paddle
+                # Hit wall first
                 x += vx * time_to_wall
                 y += vy * time_to_wall
-                vx = -vx  # Reflect off wall
-
-                # Clamp x to valid range
+                vx = -vx
                 x = max(BALL_RADIUS, min(CANVAS_WIDTH - BALL_RADIUS, x))
             else:
-                # Ball reaches paddle level
+                # Reach paddle
                 x += vx * time_to_paddle
-                y = paddle_y
                 break
 
-        # Clamp to canvas
         return max(BALL_RADIUS, min(CANVAS_WIDTH - BALL_RADIUS, x))
 
 
