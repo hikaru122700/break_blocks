@@ -460,3 +460,41 @@ class EasyBreakoutEnv(BreakoutEnv):
         for block in self.game.blocks:
             if block.y >= max_y:
                 block.is_destroyed = True
+
+    def _calculate_reward(self, events: Dict[str, Any]) -> float:
+        """
+        Survival-focused reward for easy learning.
+
+        Prioritizes:
+        - Paddle hits (keeping ball in play)
+        - Stage clear
+        - Reduced penalties
+        """
+        if not self.survival_focused:
+            return super()._calculate_reward(events)
+
+        reward = 0.0
+
+        # VERY high paddle hit reward - this is what we want to learn!
+        reward += events['paddle_hits'] * 20.0
+
+        # Block destruction
+        for score in events['block_scores']:
+            reward += 10.0
+
+        # Stage clear - big bonus
+        if events['stage_clear']:
+            reward += 500.0
+
+        # Life loss - moderate penalty
+        if events['life_lost']:
+            reward -= 50.0
+
+        # Game over - bigger penalty
+        if events['game_over']:
+            reward -= 100.0
+
+        # Minimal time penalty (already reduced via time_penalty_scale)
+        reward -= 0.02 * self.time_penalty_scale
+
+        return reward
