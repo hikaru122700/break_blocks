@@ -389,6 +389,7 @@ class EasyBreakoutEnv(BreakoutEnv):
     - Fewer blocks (configurable rows)
     - Slower ball speed
     - Longer time limit
+    - Reduced penalties for learning
     - Used to bootstrap learning before training on full game
     """
 
@@ -397,6 +398,7 @@ class EasyBreakoutEnv(BreakoutEnv):
         block_rows: int = 1,
         ball_speed_multiplier: float = 0.7,
         time_multiplier: float = 2.0,
+        survival_focused: bool = True,
         **kwargs
     ):
         """
@@ -406,12 +408,17 @@ class EasyBreakoutEnv(BreakoutEnv):
             block_rows: Number of block rows (1-8)
             ball_speed_multiplier: Ball speed multiplier (0.5-1.0)
             time_multiplier: Time limit multiplier
+            survival_focused: Use survival-focused rewards (less penalties)
             **kwargs: Additional arguments for BreakoutEnv
         """
+        # Reduce time penalty for easier learning
+        if 'time_penalty_scale' not in kwargs:
+            kwargs['time_penalty_scale'] = 0.1
         super().__init__(**kwargs)
         self.block_rows = max(1, min(8, block_rows))
         self.ball_speed_multiplier = ball_speed_multiplier
         self.time_multiplier = time_multiplier
+        self.survival_focused = survival_focused
 
     def reset(
         self,
