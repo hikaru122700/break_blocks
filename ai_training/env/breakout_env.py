@@ -379,3 +379,77 @@ class CurriculumBreakoutEnv(BreakoutEnv):
             'current_phase': self.current_phase,
             'time_penalty_scale': self.time_penalty_scale,
         }
+
+
+class EasyBreakoutEnv(BreakoutEnv):
+    """
+    Simplified Breakout environment for easier training.
+
+    Features:
+    - Fewer blocks (configurable rows)
+    - Slower ball speed
+    - Longer time limit
+    - Used to bootstrap learning before training on full game
+    """
+
+    def __init__(
+        self,
+        block_rows: int = 1,
+        ball_speed_multiplier: float = 0.7,
+        time_multiplier: float = 2.0,
+        **kwargs
+    ):
+        """
+        Initialize easy environment.
+
+        Args:
+            block_rows: Number of block rows (1-8)
+            ball_speed_multiplier: Ball speed multiplier (0.5-1.0)
+            time_multiplier: Time limit multiplier
+            **kwargs: Additional arguments for BreakoutEnv
+        """
+        super().__init__(**kwargs)
+        self.block_rows = max(1, min(8, block_rows))
+        self.ball_speed_multiplier = ball_speed_multiplier
+        self.time_multiplier = time_multiplier
+
+    def reset(
+        self,
+        *,
+        seed: Optional[int] = None,
+        options: Optional[dict] = None
+    ) -> Tuple[np.ndarray, dict]:
+        """Reset with simplified game."""
+        super().reset(seed=seed, options=options)
+
+        # Modify game after creation
+        if self.game:
+            # Reduce blocks to specified rows
+            self._reduce_blocks()
+
+            # Slow down ball
+            for ball in self.game.balls:
+                ball.speed *= self.ball_speed_multiplier
+
+            # Extend time limit
+            self.game.time_remaining *= self.time_multiplier
+            self.game.time_limit *= self.time_multiplier
+
+            # Update ball speed multiplier for consistency
+            self.game.ball_speed_multiplier *= self.ball_speed_multiplier
+
+        return self._get_obs(), self._get_info()
+
+    def _reduce_blocks(self):
+        """Remove blocks beyond the specified row count."""
+        if not self.game:
+            return
+
+        # Calculate Y threshold - keep only blocks in first N rows
+        from .constants import BLOCK_OFFSET_TOP, BLOCK_HEIGHT, BLOCK_PADDING
+        max_y = BLOCK_OFFSET_TOP + self.block_rows * (BLOCK_HEIGHT + BLOCK_PADDING)
+
+        # Mark blocks beyond threshold as destroyed
+        for block in self.game.blocks:
+            if block.y >= max_y:
+                block.is_destroyed = True
