@@ -5,12 +5,15 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "ale-py",
+    "gym[atari]",
     "gymnasium>=1.2.3",
     "huggingface-hub>=0.36.0",
     "huggingface-sb3>=3.0",
     "onnxscript>=0.5.7",
     "pyyaml>=6.0.3",
     "rich>=14.2.0",
+    "shimmy",
     "stable-baselines3>=2.7.1",
     "tensorboard>=2.20.0",
     "torch>=2.6.0",
